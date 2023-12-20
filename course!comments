@@ -1,0 +1,267 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+                                                                                                                       
+import tkinter as tk                                                                                                    
+from tkinter import ttk, END                                                                                           
+import sqlite3 as sq                                                                                                   
+import hashlib                                                                                                          
+
+win = tk.Tk()                                                                                                           
+win.title("Менеджер паролей")                                                                                           
+image_icon = tk.PhotoImage(file="image/pass_icon.png")                                                                 
+win.iconphoto(False, image_icon)                                                                                
+win.geometry("500x250")                                                                                                 
+win.resizable(False, False)                                                                            
+
+
+def show_all_records():
+    """ Функция показывает все записи из таблицы паролей """
+    with sq.connect("manager_password_base") as con:
+        cursor = con.cursor()                                                                                          
+        records = cursor.execute(f"SELECT * FROM passwords").fetchall()                                                 
+
+    key_list = []                                                                                                     
+
+    for index, values in enumerate(records):                                                                            
+        key_list.append(records[index][0])                                                                           
+
+    def show_info():
+        """ Функция показываем выбранную записи при нажатии на кнопку - Показать """
+        for index, values in enumerate(records):                                                                       
+            if records[index][0] == combo.get():                                                                       
+                name_text.delete(0, END)                                                                           
+                login_text.delete(0, END)
+                pass_text.delete(0, END)
+
+                name_text.insert(0, records[index][0])                                                        
+                login_text.insert(0, records[index][1])
+                """
+                По скольку, расшифровать хеширование md5 - не представляет возможным. Используется метод проверки всех паролей 
+                из файла по созданию хеша и сверки его с хешом из базы данных. Однако при проектирования комерческой программы 
+                обычный текстовый файл - необходимо заменить, на другой метод, который не будет указывать на проект и его базу данных или 
+                программный код, но для решения образовательнй работы - я посчитал такой метод - уместным 
+                """
+                with open("key.txt", "r") as file:                                                                      
+                    for line in file:                                                                                   
+                        md5_password = hashlib.md5(line.strip().encode()).hexdigest()                              
+                        if md5_password == records[index][2]:                                                          
+                            pass_text.insert(0, line.strip())                                                     
+                            break
+
+
+    def back_to_select():
+        """ Функция удаляет графические объекты и возвращет на шаг назад """
+
+        combo.destroy()
+        label_name.destroy()
+        name_text.destroy()
+        label_login.destroy()
+        login_text.destroy()
+        label_password.destroy()
+        pass_text.destroy()
+        button_show.destroy()
+        button_back.destroy()
+
+        select_create_or_show()
+
+    combo = ttk.Combobox(win, values=key_list)
+    combo.grid(row=0, column=0)
+
+    label_name = tk.Label(win, text="Название")
+    label_name.grid(row=1, column=0)
+
+    name_text = tk.Entry(win, width=30)
+    name_text.grid(row=2, column=0)
+
+    label_login = tk.Label(win, text="Логин")
+    label_login.grid(row=3, column=0)
+
+    login_text = tk.Entry(win, width=30)
+    login_text.grid(row=4, column=0)
+
+    label_password = tk.Label(win, text="Пароль")
+    label_password.grid(row=5, column=0)
+
+    pass_text = tk.Entry(win, width=30)
+    pass_text.grid(row=6, column=0)
+
+    button_show = tk.Button(win, text="Показать", command=show_info)
+    button_show.grid(row=7, column=0)
+
+    button_back = tk.Button(win, text="Назад", command=back_to_select)
+    button_back.grid(row=8, column=0)
+
+def select_create_or_show():
+    """ Функция показывает интерфейс выбора - Создать пароль или Показать все пароли """
+
+    def create_new():
+        """ Функция закрывает объекты графического интерфейса и переходит в функцию Создания пароля """
+        button_create.destroy()
+        button_show.destroy()
+        create_new_record()
+
+    def show_all():
+        """ Функция закрывает объекты графического интерфейса и переходит в функцию Показать все пароли """
+        button_create.destroy()
+        button_show.destroy()
+        show_all_records()
+
+    button_create = tk.Button(win, text="Создать новую запись", command=create_new)                                     
+    button_create.grid(row=0, column=0, padx=30, pady=30, sticky=tk.NS)
+
+    button_show = tk.Button(win, text="Показать все записи", command=show_all)
+    button_show.grid(row=1, column=0, padx=50, pady=50, sticky=tk.NS)
+
+def create_new_record(): # select_1
+    """ Функция создает новую запись """
+
+    def create_new():
+        """ Функция непосредственной записи в базы данных - новой записи """
+
+        name_record = name_text.get()
+        login_record = login_text.get()
+        pass_record = password_text.get()
+
+        if name_record:
+            if login_record:
+                if pass_record:
+                    with sq.connect("manager_password_base") as con:                                                    
+                        cursor = con.cursor()                                                                           
+
+                        md5_password = hashlib.md5(pass_record.encode()).hexdigest()                                    
+
+                        f = open("key.txt", "a")                                                                       
+                        f.write(f"{pass_record}\n")                                                                    
+                        f.close()                                                                                      
+
+                        cursor.execute(f"INSERT INTO passwords (name, login, password) VALUES ('{name_record}', '{login_record}', \"{md5_password}\")")
+
+                    label_error.configure(text="Запись создана! Можете создать еще одну")                              
+                    name_text.delete(0, END)
+                    login_text.delete(0, END)
+                    password_text.delete(0, END)
+                else:
+                    label_error.configure(text="Данные введены не корректно")
+            else:
+                label_error.configure(text="Данные введены не корректно")
+        else:
+            label_error.configure(text="Данные введены не корректно")
+
+    def back_to_select():
+        """ Функция удаляет графические объекты и возвращет на шаг назад """
+        label_create.destroy()
+        label_name.destroy()
+        name_text.destroy()
+        label_login.destroy()
+        login_text.destroy()
+        label_password.destroy()
+        password_text.destroy()
+        button_master_pass_enter.destroy()
+        button_master_pass_exit.destroy()
+        label_error.destroy()
+
+        select_create_or_show()
+
+    label_create = tk.Label(win, text="Создайте новую запись")
+    label_create.grid(row=0, column=0)
+
+    label_name = tk.Label(win, text="Название")
+    label_name.grid(row=1, column=0)
+
+    name_text = tk.Entry(win, width=30)
+    name_text.grid(row=2, column=0)
+
+    label_login = tk.Label(win, text="Логин")
+    label_login.grid(row=3, column=0)
+
+    login_text = tk.Entry(win, width=30)
+    login_text.grid(row=4, column=0)
+
+    label_password = tk.Label(win, text="Пароль")
+    label_password.grid(row=5, column=0)
+
+    password_text = tk.Entry(win, width=30)
+    password_text.grid(row=6, column=0)
+
+    label_error = tk.Label(win, text=" ")
+    label_error.grid(row=7, column=0)
+
+    button_master_pass_enter = tk.Button(win, text="Создать", command=create_new)
+    button_master_pass_enter.grid(row=8, column=0)
+    button_master_pass_exit = tk.Button(win, text="Назад", command=back_to_select)
+    button_master_pass_exit.grid(row=9, column=0)
+
+def create_request_for_new_master_pass(text):
+    """ Функция новой записи о мастер пароле в базу данных """
+    with sq.connect("manager_password_base") as con:
+        cursor = con.cursor()                                                                                           
+
+        md5_password = hashlib.md5(text.encode()).hexdigest()                                                           
+        cursor.execute(f"INSERT INTO master_pass (password) VALUES (\"{md5_password}\")")
+
+def first_stage_program():
+    """
+    Функция проверяет наличие мастер-пароля в базе данных
+    и по его отсутсвию выводит - регистрацию
+    """
+    with sq.connect("manager_password_base") as con:                                                                    
+        cursor = con.cursor()                                                                                           
+        master_password_info = cursor.execute(f"SELECT password FROM master_pass").fetchone()                           
+
+        def create_master_password():
+            """ Функция создания мастер-пароля """
+            text = entry_master_pass_text.get()                                                                         
+            if text:                                                                                                   
+                create_request_for_new_master_pass(text)                                                               
+                entry_master_pass_text.destroy()                                                                        
+                button_master_pass_enter.destroy()                                                                      
+                label_text.destroy()                                                                                    
+                select_create_or_show()                                                                                 
+            else:                                                                                                       
+                ...                                                                                                     
+
+        if master_password_info == None:                                                                                
+            label_text = tk.Label(win, text="Создайте пароль для входа")                                                
+            label_text.grid(row=0, column=0)
+
+            entry_master_pass_text = tk.Entry(win, width=30)                                                            
+            entry_master_pass_text.grid(row=1, column=0)
+
+            button_master_pass_enter = tk.Button(win, text="Создать",command=create_master_password)                   
+            button_master_pass_enter.grid(row=2, column=0)
+
+            win.grid_columnconfigure(0, minsize=500)                                                              
+            win.grid_columnconfigure(1, minsize=100)                                                             
+
+        else:                                                                                                           
+            def password_verification():
+                """ Функция проверки пароля """
+                text = entry_master_pass_text.get()                                                                     
+                if text:                                                                                               
+                    md5_password = hashlib.md5(text.encode()).hexdigest()                                             
+                    if master_password_info[0] == md5_password:                                                        
+                        entry_master_pass_text.destroy()                                                                
+                        button_master_pass_enter.destroy()                                                             
+                        label_text.destroy()                                                                            
+                        select_create_or_show()                                                                         
+                    else:                                                                                             
+                        label_text.configure(text="Не верно! Введите пароль для входа")                               
+                else:                                                                                                   
+                    ...                                                                                               
+
+            label_text = tk.Label(win, text="Введите пароль для входа")                                             
+            label_text.grid(row=0, column=0)
+
+            entry_master_pass_text = tk.Entry(win, width=30)                                                          
+            entry_master_pass_text.grid(row=1, column=0)
+
+            button_master_pass_enter = tk.Button(win, text="Войти", command=password_verification)                     
+            button_master_pass_enter.grid(row=3, column=0)
+
+            win.grid_columnconfigure(0, minsize=500)                                                             
+            win.grid_columnconfigure(1, minsize=100)                                                          
+
+
+if __name__ == "__main__":                                                                                              
+    first_stage_program()                                                                                              
+    win.mainloop()                                                                                                      
